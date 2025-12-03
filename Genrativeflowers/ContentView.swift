@@ -55,31 +55,32 @@ struct ContentView: View {
             drawGrainOverlay(context: scaledContext, size: size, time: time)
           }
         }
-        // Double-tap to cycle palette
-        .onTapGesture(count: 2) {
-          model.cyclePalette()
-          HapticManager.shared.success()
-        }
-        // Single tap to spawn flower
-        .onTapGesture(count: 1) { location in
-          model.addFlower(at: location)
-          HapticManager.shared.light()
-        }
-        // Pinch to scale scene
-        .gesture(
-          MagnificationGesture()
-            .updating($magnification) { value, state, _ in
-              state = value
-            }
-            .onEnded { value in
-              model.globalScale *= value
-            }
-        )
-        .overlay(alignment: .bottomTrailing) {
-          // Control panel - using overlay so it doesn't block canvas gestures
-          ControlPanel(model: model, canvasSize: geometry.size)
-            .padding()
-        }
+
+        // Transparent touch layer to capture gestures
+        Rectangle()
+          .fill(Color.clear)
+          .contentShape(Rectangle())
+          .onTapGesture(count: 2) {
+            model.cyclePalette()
+            HapticManager.shared.success()
+          }
+          .onTapGesture(count: 1) { location in
+            model.addFlower(at: location)
+            HapticManager.shared.light()
+          }
+          .gesture(
+            MagnificationGesture()
+              .updating($magnification) { value, state, _ in
+                state = value
+              }
+              .onEnded { value in
+                model.globalScale *= value
+              }
+          )
+          .overlay(alignment: .bottomTrailing) {
+            ControlPanel(model: model, canvasSize: geometry.size)
+              .padding()
+          }
       }
     }
     .preferredColorScheme(.dark)
