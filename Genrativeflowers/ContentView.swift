@@ -10,61 +10,55 @@ import SwiftUI
 struct ContentView: View {
   @State private var model = GardenModel()
   @GestureState private var magnification: CGFloat = 1.0
+  @State private var showControlPanel = false
 
   var body: some View {
     GeometryReader { geometry in
       ZStack {
-        // Background gradient
-        LinearGradient(
-          colors: [
-            Color(red: 0.05, green: 0.05, blue: 0.15),
-            Color(red: 0.1, green: 0.05, blue: 0.2),
-            Color(red: 0.15, green: 0.1, blue: 0.25),
-          ],
-          startPoint: .top,
-          endPoint: .bottom
-        )
-        .ignoresSafeArea()
+        ZStack {
+          // Background gradient
+          LinearGradient(
+            colors: [
+              Color(red: 0.05, green: 0.05, blue: 0.15),
+              Color(red: 0.1, green: 0.05, blue: 0.2),
+              Color(red: 0.15, green: 0.1, blue: 0.25),
+            ],
+            startPoint: .top,
+            endPoint: .bottom
+          )
+          .ignoresSafeArea()
 
-        // Stars layer
-        if model.showStars {
-          StarsView(size: geometry.size)
-            .allowsHitTesting(false)  // Don't block taps - let them pass through to canvas
-        }
-
-        // Main flower canvas
-        TimelineView(.animation) { timeline in
-          Canvas { context, size in
-            let time = timeline.date.timeIntervalSince1970
-            model.updateTime(time)
-
-            // Apply global scale
-            var scaledContext = context
-            scaledContext.scaleBy(
-              x: model.globalScale * magnification, y: model.globalScale * magnification)
-
-            // Draw fog/mist layer at bottom
-            drawFogLayer(context: scaledContext, size: size)
-
-            // Draw all flowers
-            for flower in model.flowers {
-              drawFlower(flower, context: scaledContext, size: size, time: time)
-            }
-
-            // Draw grain overlay
-            drawGrainOverlay(context: scaledContext, size: size, time: time)
+          // Stars layer
+          if model.showStars {
+            StarsView(size: geometry.size)
+              .allowsHitTesting(false)
           }
-        }
 
-        // Transparent touch layer to capture gestures
-        Rectangle()
-          .fill(Color.clear)
-          .contentShape(Rectangle())
+          // Main flower canvas
+          TimelineView(.animation) { timeline in
+            Canvas { context, size in
+              let time = timeline.date.timeIntervalSince1970
+              model.updateTime(time)
+
+              var scaledContext = context
+              scaledContext.scaleBy(
+                x: model.globalScale * magnification, y: model.globalScale * magnification)
+
+              drawFogLayer(context: scaledContext, size: size)
+
+              for flower in model.flowers {
+                drawFlower(flower, context: scaledContext, size: size, time: time)
+              }
+
+              drawGrainOverlay(context: scaledContext, size: size, time: time)
+            }
+          }
           .onTapGesture(count: 2) {
             model.cyclePalette()
             HapticManager.shared.success()
           }
-          .onTapGesture(count: 1) { location in
+          .onTapGesture { location in
+            // Simple tap to spawn flower
             model.addFlower(at: location)
             HapticManager.shared.light()
           }
@@ -77,10 +71,31 @@ struct ContentView: View {
                 model.globalScale *= value
               }
           )
-          .overlay(alignment: .bottomTrailing) {
-            ControlPanel(model: model, canvasSize: geometry.size)
-              .padding()
+        }
+
+        // Control panel popup button
+        VStack {
+          Spacer()
+          HStack {
+            Spacer()
+            Button {
+              showControlPanel.toggle()
+            } label: {
+              Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 24))
+                .foregroundStyle(.white)
+                .frame(width: 56, height: 56)
+                .background(.ultraThinMaterial)
+                .clipShape(Circle())
+                .shadow(color: .black.opacity(0.3), radius: 10)
+            }
+            .padding()
           }
+        }
+      }
+      // Control panel sheet
+      .sheet(isPresented: $showControlPanel) {
+        ControlPanelSheet(model: model, canvasSize: geometry.size)
       }
     }
     .preferredColorScheme(.dark)
