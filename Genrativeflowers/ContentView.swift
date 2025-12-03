@@ -9,8 +9,6 @@ import SwiftUI
 
 struct ContentView: View {
   @State private var model = GardenModel()
-  @State private var selectedFlower: Flower?
-  @State private var longPressLocation: CGPoint?
   @GestureState private var magnification: CGFloat = 1.0
 
   var body: some View {
@@ -56,36 +54,18 @@ struct ContentView: View {
             drawGrainOverlay(context: scaledContext, size: size, time: time)
           }
         }
+        // Double-tap to cycle palette
+        .onTapGesture(count: 2) {
+          model.cyclePalette()
+          HapticManager.shared.success()
+        }
+        // Single tap to spawn flower
+        .onTapGesture(count: 1) { location in
+          model.addFlower(at: location)
+          HapticManager.shared.light()
+        }
+        // Pinch to scale scene
         .gesture(
-          TapGesture()
-            .onEnded { value in
-              // Calculate tap location in the geometry space
-              // Since TapGesture doesn't provide location, we'll use the last known location
-              // For now, let's add a simple tap handler
-            }
-        )
-        .gesture(
-          DragGesture(minimumDistance: 5)  // Increased from 0 to distinguish from taps
-            .onChanged { value in
-              handleDrag(value, in: geometry.size)
-            }
-            .onEnded { _ in
-              selectedFlower = nil
-            }
-        )
-        .simultaneousGesture(
-          LongPressGesture(minimumDuration: 0.5)
-            .onEnded { _ in
-              if let location = longPressLocation,
-                let flower = model.findNearestFlower(to: location)
-              {
-                withAnimation(.easeOut(duration: 0.2)) {
-                  model.removeFlower(flower)
-                }
-              }
-            }
-        )
-        .simultaneousGesture(
           MagnificationGesture()
             .updating($magnification) { value, state, _ in
               state = value
@@ -94,12 +74,8 @@ struct ContentView: View {
               model.globalScale *= value
             }
         )
-        .onTapGesture { location in
-          // Spawn flower at tap location
-          model.addFlower(at: location)
-        }
 
-        // Control panel
+        // Control panel - placed AFTER canvas so it receives taps first
         VStack {
           Spacer()
           HStack {
@@ -108,30 +84,10 @@ struct ContentView: View {
               .padding()
           }
         }
+        .allowsHitTesting(true)
       }
     }
     .preferredColorScheme(.dark)
-  }
-
-  // MARK: - Gesture Handlers
-
-  private func handleDrag(_ value: DragGesture.Value, in size: CGSize) {
-    longPressLocation = value.location
-
-    if selectedFlower == nil {
-      // Check if we're dragging an existing flower
-      if let flower = model.findNearestFlower(to: value.location) {
-        selectedFlower = flower
-      } else if value.translation == .zero {
-        // This is a tap - spawn new flower
-        model.addFlower(at: value.location)
-      }
-    }
-
-    // Move selected flower
-    if let flower = selectedFlower {
-      model.moveFlower(flower, to: value.location)
-    }
   }
 
   // MARK: - Drawing Functions
