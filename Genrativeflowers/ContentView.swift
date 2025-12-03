@@ -75,17 +75,11 @@ struct ContentView: View {
               model.globalScale *= value
             }
         )
-
-        // Control panel - placed AFTER canvas so it receives taps first
-        VStack {
-          Spacer()
-          HStack {
-            Spacer()
-            ControlPanel(model: model, canvasSize: geometry.size)
-              .padding()
-          }
+        .overlay(alignment: .bottomTrailing) {
+          // Control panel - using overlay so it doesn't block canvas gestures
+          ControlPanel(model: model, canvasSize: geometry.size)
+            .padding()
         }
-        .allowsHitTesting(true)
       }
     }
     .preferredColorScheme(.dark)
