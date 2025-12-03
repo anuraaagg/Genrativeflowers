@@ -29,6 +29,7 @@ struct ContentView: View {
         // Stars layer
         if model.showStars {
           StarsView(size: geometry.size)
+            .allowsHitTesting(false)  // Don't block taps - let them pass through to canvas
         }
 
         // Main flower canvas
