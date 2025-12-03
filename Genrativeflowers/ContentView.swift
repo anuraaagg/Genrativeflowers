@@ -15,65 +15,56 @@ struct ContentView: View {
   var body: some View {
     GeometryReader { geometry in
       ZStack {
-        ZStack {
-          // Background gradient
-          LinearGradient(
-            colors: [
-              Color(red: 0.05, green: 0.05, blue: 0.15),
-              Color(red: 0.1, green: 0.05, blue: 0.2),
-              Color(red: 0.15, green: 0.1, blue: 0.25),
-            ],
-            startPoint: .top,
-            endPoint: .bottom
-          )
-          .ignoresSafeArea()
+        // Layer 1: Background
+        LinearGradient(
+          colors: [
+            Color(red: 0.05, green: 0.05, blue: 0.15),
+            Color(red: 0.1, green: 0.05, blue: 0.2),
+            Color(red: 0.15, green: 0.1, blue: 0.25),
+          ],
+          startPoint: .top,
+          endPoint: .bottom
+        )
+        .ignoresSafeArea()
 
-          // Stars layer
-          if model.showStars {
-            StarsView(size: geometry.size)
-              .allowsHitTesting(false)
-          }
+        // Layer 2: Stars
+        if model.showStars {
+          StarsView(size: geometry.size)
+            .allowsHitTesting(false)
+        }
 
-          // Main flower canvas
-          TimelineView(.animation) { timeline in
-            Canvas { context, size in
-              let time = timeline.date.timeIntervalSince1970
-              model.updateTime(time)
+        // Layer 3: Drawing Canvas (Visuals ONLY, No Interactions)
+        TimelineView(.animation) { timeline in
+          Canvas { context, size in
+            let time = timeline.date.timeIntervalSince1970
+            model.updateTime(time)
 
-              var scaledContext = context
-              scaledContext.scaleBy(
-                x: model.globalScale * magnification, y: model.globalScale * magnification)
+            var scaledContext = context
+            scaledContext.scaleBy(
+              x: model.globalScale * magnification, y: model.globalScale * magnification)
 
-              drawFogLayer(context: scaledContext, size: size)
+            drawFogLayer(context: scaledContext, size: size)
 
-              for flower in model.flowers {
-                drawFlower(flower, context: scaledContext, size: size, time: time)
-              }
-
-              drawGrainOverlay(context: scaledContext, size: size, time: time)
+            for flower in model.flowers {
+              drawFlower(flower, context: scaledContext, size: size, time: time)
             }
+
+            drawGrainOverlay(context: scaledContext, size: size, time: time)
           }
-          .onTapGesture(count: 2) {
-            model.cyclePalette()
-            HapticManager.shared.success()
-          }
+        }
+        .allowsHitTesting(false)  // Explicitly disable hits on canvas to prevent interference
+
+        // Layer 4: Interaction Layer (Transparent, Handles ALL Gestures)
+        Color.black.opacity(0.001)  // Almost invisible but captures touches
+          .contentShape(Rectangle())
           .onTapGesture { location in
-            // Simple tap to spawn flower
+            // Interaction 1: Tap to Spawn
+            print("Tap detected at: \(location)")
             model.addFlower(at: location)
             HapticManager.shared.light()
           }
-          .gesture(
-            MagnificationGesture()
-              .updating($magnification) { value, state, _ in
-                state = value
-              }
-              .onEnded { value in
-                model.globalScale *= value
-              }
-          )
-        }
 
-        // Control panel popup button
+        // Layer 5: UI Controls (Topmost)
         VStack {
           Spacer()
           HStack {
@@ -93,7 +84,6 @@ struct ContentView: View {
           }
         }
       }
-      // Control panel sheet
       .sheet(isPresented: $showControlPanel) {
         ControlPanelSheet(model: model, canvasSize: geometry.size)
       }
