@@ -28,26 +28,32 @@ class MotionManager {
   }
 
   func startMonitoring() {
-    guard motionManager.isDeviceMotionAvailable else {
-      print("⚠️ Device motion not available")
+    #if targetEnvironment(simulator)
+      // Motion sensors not available on simulator - skip silently
+      print("ℹ️ Motion sensors disabled on simulator")
       return
-    }
+    #else
+      guard motionManager.isDeviceMotionAvailable else {
+        print("⚠️ Device motion not available")
+        return
+      }
 
-    motionManager.deviceMotionUpdateInterval = 1.0 / 60.0  // 60 Hz
+      motionManager.deviceMotionUpdateInterval = 1.0 / 60.0  // 60 Hz
 
-    motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, error in
-      guard let self = self, let motion = motion else { return }
+      motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, error in
+        guard let self = self, let motion = motion else { return }
 
-      // Low-pass filter for smooth tilt
-      let rawTiltX = motion.gravity.x
-      let rawTiltY = motion.gravity.y
+        // Low-pass filter for smooth tilt
+        let rawTiltX = motion.gravity.x
+        let rawTiltY = motion.gravity.y
 
-      self.tiltX = self.tiltX * (1 - self.lowPassAlpha) + rawTiltX * self.lowPassAlpha
-      self.tiltY = self.tiltY * (1 - self.lowPassAlpha) + rawTiltY * self.lowPassAlpha
+        self.tiltX = self.tiltX * (1 - self.lowPassAlpha) + rawTiltX * self.lowPassAlpha
+        self.tiltY = self.tiltY * (1 - self.lowPassAlpha) + rawTiltY * self.lowPassAlpha
 
-      // Gyro rotation rate (z-axis)
-      self.gyroRotationRate = motion.rotationRate.z
-    }
+        // Gyro rotation rate (z-axis)
+        self.gyroRotationRate = motion.rotationRate.z
+      }
+    #endif
   }
 
   func stopMonitoring() {

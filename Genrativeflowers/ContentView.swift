@@ -57,7 +57,15 @@ struct ContentView: View {
           }
         }
         .gesture(
-          DragGesture(minimumDistance: 0)
+          TapGesture()
+            .onEnded { value in
+              // Calculate tap location in the geometry space
+              // Since TapGesture doesn't provide location, we'll use the last known location
+              // For now, let's add a simple tap handler
+            }
+        )
+        .gesture(
+          DragGesture(minimumDistance: 5)  // Increased from 0 to distinguish from taps
             .onChanged { value in
               handleDrag(value, in: geometry.size)
             }
@@ -86,6 +94,10 @@ struct ContentView: View {
               model.globalScale *= value
             }
         )
+        .onTapGesture { location in
+          // Spawn flower at tap location
+          model.addFlower(at: location)
+        }
 
         // Control panel
         VStack {
