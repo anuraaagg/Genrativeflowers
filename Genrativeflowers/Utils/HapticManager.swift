@@ -7,60 +7,49 @@
 
 import UIKit
 
-/// Manages haptic feedback for interactions
 class HapticManager {
   static let shared = HapticManager()
 
-  private let lightImpact = UIImpactFeedbackGenerator(style: .light)
-  private let rigidImpact = UIImpactFeedbackGenerator(style: .rigid)
-  private let softImpact = UIImpactFeedbackGenerator(style: .soft)
-  private let heavyImpact = UIImpactFeedbackGenerator(style: .heavy)
-  private let notificationGenerator = UINotificationFeedbackGenerator()
+  private let impactLight = UIImpactFeedbackGenerator(style: .light)
+  private let impactMedium = UIImpactFeedbackGenerator(style: .medium)
+  private let impactHeavy = UIImpactFeedbackGenerator(style: .heavy)
+  private let notification = UINotificationFeedbackGenerator()
+  private let selection = UISelectionFeedbackGenerator()
 
   private init() {
-    // Prepare generators
-    lightImpact.prepare()
-    rigidImpact.prepare()
-    softImpact.prepare()
-    heavyImpact.prepare()
-    notificationGenerator.prepare()
+    // Prepare generators to reduce latency
+    impactLight.prepare()
+    impactMedium.prepare()
+    impactHeavy.prepare()
+    notification.prepare()
+    selection.prepare()
   }
 
-  // MARK: - Haptic Methods
-
-  /// Light impact (e.g., tap to spawn flower)
   func light() {
-    lightImpact.impactOccurred()
-    lightImpact.prepare()
+    impactLight.impactOccurred()
   }
 
-  /// Rigid impact (e.g., enter drawing mode)
-  func rigid() {
-    rigidImpact.impactOccurred()
-    rigidImpact.prepare()
+  func medium() {
+    impactMedium.impactOccurred()
   }
 
-  /// Soft impact (e.g., release drawing mode)
-  func soft() {
-    softImpact.impactOccurred()
-    softImpact.prepare()
-  }
-
-  /// Heavy impact (e.g., reset confirmation)
   func heavy() {
-    heavyImpact.impactOccurred()
-    heavyImpact.prepare()
+    impactHeavy.impactOccurred()
   }
 
-  /// Success notification (e.g., palette cycle)
   func success() {
-    notificationGenerator.notificationOccurred(.success)
-    notificationGenerator.prepare()
+    notification.notificationOccurred(.success)
   }
 
-  /// Warning notification (e.g., reset canceled)
   func warning() {
-    notificationGenerator.notificationOccurred(.warning)
-    notificationGenerator.prepare()
+    notification.notificationOccurred(.warning)
+  }
+
+  func error() {
+    notification.notificationOccurred(.error)
+  }
+
+  func selectionChanged() {
+    selection.selectionChanged()
   }
 }

@@ -7,60 +7,62 @@
 
 import Combine
 import CoreMotion
-import Foundation
+import SwiftUI
 
-/// Manages device motion for parallax and gyro-based wind control
-@Observable
-class MotionManager {
+class MotionManager: ObservableObject {
+  static let shared = MotionManager()
+
   private let motionManager = CMMotionManager()
 
-  // Tilt (for parallax)
-  var tiltX: Double = 0.0
-  var tiltY: Double = 0.0
+  // Published values for UI binding
+  @Published var pitch: Double = 0.0
+  @Published var roll: Double = 0.0
+  @Published var gyroRotationRate: Double = 0.0
 
-  // Gyro (for wind direction when rotating)
-  var gyroRotationRate: Double = 0.0
-
-  private let lowPassAlpha: Double = 0.05  // Smoothing factor
+  // Smoothing factor (Low-pass filter)
+  private let alpha: Double = 0.05
 
   init() {
-    startMonitoring()
+    startMotionUpdates()
   }
 
-  func startMonitoring() {
-    #if targetEnvironment(simulator)
-      // Motion sensors not available on simulator - skip silently
-      print("ℹ️ Motion sensors disabled on simulator")
-      return
-    #else
-      guard motionManager.isDeviceMotionAvailable else {
-        print("⚠️ Device motion not available")
-        return
-      }
-
-      motionManager.deviceMotionUpdateInterval = 1.0 / 60.0  // 60 Hz
-
+  func startMotionUpdates() {
+    // Device Motion (Accelerometer + Gyro fused)
+    if motionManager.isDeviceMotionAvailable {
+      motionManager.deviceMotionUpdateInterval = 1.0 / 60.0
       motionManager.startDeviceMotionUpdates(to: .main) { [weak self] motion, error in
         guard let self = self, let motion = motion else { return }
 
-        // Low-pass filter for smooth tilt
-        let rawTiltX = motion.gravity.x
-        let rawTiltY = motion.gravity.y
+        // Apply low-pass filter for smoothing
+        // x_t = x_{t-1} * (1 - α) + x_measure * α
 
-        self.tiltX = self.tiltX * (1 - self.lowPassAlpha) + rawTiltX * self.lowPassAlpha
-        self.tiltY = self.tiltY * (1 - self.lowPassAlpha) + rawTiltY * self.lowPassAlpha
-
-        // Gyro rotation rate (z-axis)
-        self.gyroRotationRate = motion.rotationRate.z
+        self.pitch = self.pitch * (1 - self.alpha) + motion.attitude.pitch * self.alpha
+        self.roll = self.roll * (1 - self.alpha) + motion.attitude.roll * self.alpha
       }
-    #endif
+    }
+
+    // Raw Gyro for wind control (rotation rate)
+    if motionManager.isGyroAvailable {
+      motionManager.gyroUpdateInterval = 1.0 / 60.0
+      motionManager.startGyroUpdates(to: .main) { [weak self] data, error in
+        guard let self = self, let data = data else { return }
+
+        // We use rotation around Z axis (yaw-like) for wind direction influence
+        // Or simply use the magnitude of rotation to stir the wind
+        let rotationRate = data.rotationRate.z
+
+        // Smooth the gyro data too
+        self.gyroRotationRate = self.gyroRotationRate * (1 - self.alpha) + rotationRate * self.alpha
+      }
+    }
   }
 
-  func stopMonitoring() {
+  func stopUpdates() {
     motionManager.stopDeviceMotionUpdates()
+    motionManager.stopGyroUpdates()
   }
 
   deinit {
-    stopMonitoring()
+    stopUpdates()
   }
 }

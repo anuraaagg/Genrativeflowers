@@ -5,97 +5,67 @@
 //  Created by Anurag Singh on 02/12/25.
 //
 
-import Foundation
 import SwiftUI
 
-/// Represents a single generative flower with all visual and animation properties
-struct Flower: Identifiable {
-  let id: UUID
-  var position: CGPoint  // Current head position (calculated from stem end)
+struct Flower: Identifiable, Equatable {
+  let id = UUID()
+  var position: CGPoint
+  var scale: CGFloat = 1.0
+  var rotation: Double = 0.0
+  var seed: Double
+  var creationTime: TimeInterval = Date().timeIntervalSince1970
+  var stemHeight: CGFloat = 120.0  // Height from ground to flower head
 
-  // Generative properties
-  let colorSeed: Double
-  let petalCount: Int
-  let petalRadius: CGFloat
-  let stemCurvature: CGFloat
-  let swaySpeed: Double
-  let swayPhase: Double  // Randomized phase for wind variation
-  var scale: CGFloat
-
-  // Grounded physics properties
-  var stemPath: [CGPoint]  // Points defining the stem (if drawn)
-  let baseX: CGFloat  // Anchor point on the ground
-  let height: CGFloat  // Height of the flower
-
-  // Computed color based on palette
-  func color(palette: ColorPalette) -> Color {
-    return palette.randomColor(seed: colorSeed)
-  }
-
-  init(
-    id: UUID = UUID(),
-    position: CGPoint,  // Initial head position
-    stemPath: [CGPoint] = [],  // Optional drawn stem
-    colorSeed: Double? = nil,
-    petalCount: Int? = nil,
-    petalRadius: CGFloat? = nil,
-    stemCurvature: CGFloat? = nil,
-    swaySpeed: Double? = nil,
-    swayPhase: Double? = nil,
-    scale: CGFloat? = nil
-  ) {
-    self.id = id
+  init(position: CGPoint, seed: Double, stemHeight: CGFloat = 120.0) {
     self.position = position
-    self.stemPath = stemPath
-
-    // If stem path provided, base is the first point, head is the last
-    if let first = stemPath.first, let last = stemPath.last {
-      self.baseX = first.x
-      self.height = abs(first.y - last.y)
-    } else {
-      // Default vertical stem if spawned via tap
-      self.baseX = position.x
-      self.height = 300  // Default height
-    }
-
-    self.colorSeed = colorSeed ?? Double.random(in: 0...1)
-    self.petalCount = petalCount ?? Int.random(in: 5...8)
-    self.petalRadius = petalRadius ?? CGFloat.random(in: 20...40)
-    self.stemCurvature = stemCurvature ?? CGFloat.random(in: 0.3...1.2)
-    self.swaySpeed = swaySpeed ?? Double.random(in: 0.8...1.5)
-    self.swayPhase = swayPhase ?? Double.random(in: 0...(.pi * 2))
-    self.scale = scale ?? CGFloat.random(in: 0.7...1.3)
+    self.seed = seed
+    self.stemHeight = stemHeight
   }
 
-  // Helper to calculate current head position based on wind
+  // Visual properties derived from seed
+  var petalCount: Int {
+    return 5 + Int(seed.truncatingRemainder(dividingBy: 4))
+  }
+
+  var petalRadius: CGFloat {
+    return 20 + CGFloat(seed.truncatingRemainder(dividingBy: 15))
+  }
+
+  var swayPhase: Double {
+    return seed * 0.1
+  }
+
+  // Helper to get color based on current palette
+  func color(palette: ColorPalette) -> Color {
+    return palette.randomColor(seed: seed)
+  }
+
+  // Physics simulation for ultra-smooth, heavy fluid wind
   func currentHeadPosition(time: TimeInterval, windStrength: Double, windDirection: Double)
     -> CGPoint
   {
-    // Calculate sway from natural movement and wind
-    let baseSway = sin(time * swaySpeed + swayPhase) * (10 * stemCurvature)
-    let windEffect =
-      sin(time * 2 + swayPhase) * (windStrength * 0.5) + (windStrength * cos(windDirection) * 0.3)
+    // "Heavy" air feeling - very slow but large movement
+    let flowSpeed = 0.05  // Extremely slow cycle
+    let flowAmount = 12.0  // Large idle sway
 
-    let totalSway = baseSway + windEffect
+    // Smooth sine wave for idle movement
+    let flowX = sin(time * flowSpeed + swayPhase) * flowAmount
+    let flowY = cos(time * flowSpeed * 0.5 + swayPhase) * (flowAmount * 0.4)
 
-    // For grounded flowers, position is fixed height, sway affects X
-    if stemPath.isEmpty {
-      // Simple vertical stem
-      return CGPoint(
-        x: baseX + totalSway,
-        y: position.y
-      )
-    } else {
-      // Drawn stem - head is last point plus sway
-      return CGPoint(
-        x: position.x + totalSway,
-        y: position.y
-      )
-    }
+    // Dramatic wind lean (increased significantly)
+    // Using power function to make strong wind feel exponential
+    let leanFactor = windStrength * 2.5  // Much stronger multiplier
+
+    let windLeanX = cos(windDirection) * leanFactor
+    let windLeanY = sin(windDirection) * leanFactor * 0.4
+
+    return CGPoint(
+      x: position.x + windLeanX + flowX,
+      y: position.y + windLeanY + flowY
+    )
   }
 
-  // Helper for glow pulsation
   func glowPulse(at time: TimeInterval) -> Double {
-    (sin(time * 1.2 + swayPhase) + 1) / 2
+    return (sin(time * 2 + swayPhase) + 1) * 0.5
   }
 }

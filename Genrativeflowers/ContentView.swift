@@ -5,437 +5,225 @@
 //  Created by Anurag Singh on 02/12/25.
 //
 
+import Combine
 import SwiftUI
 
 struct ContentView: View {
-  @State private var model = GardenModel()
-  @GestureState private var magnification: CGFloat = 1.0
-  @State private var showControlPanel = false
+  @StateObject private var appState = AppState()
+  @State private var currentFlowerId: UUID? = nil  // Track the flower we just spawned
 
   var body: some View {
     GeometryReader { geometry in
       ZStack {
-        // Layer 1: Background
+        // 1. Gradient Background
         LinearGradient(
           colors: [
-            Color(red: 0.05, green: 0.05, blue: 0.15),
-            Color(red: 0.1, green: 0.05, blue: 0.2),
-            Color(red: 0.15, green: 0.1, blue: 0.25),
+            Color(red: 0.08, green: 0.10, blue: 0.18),  // Soft deep indigo
+            Color(red: 0.04, green: 0.06, blue: 0.12),  // Smooth mid-tone
+            Color(red: 0.02, green: 0.03, blue: 0.08),  // Gentle dark blue
+            Color(red: 0.01, green: 0.02, blue: 0.05),  // Soft black
           ],
           startPoint: .top,
           endPoint: .bottom
         )
         .ignoresSafeArea()
 
-        // Layer 2: Stars
-        if model.showStars {
-          StarsView(size: geometry.size)
-            .allowsHitTesting(false)
+        // 2. Stars Layer
+        if appState.showStars {
+          GeometryReader { geo in
+            StarsView(size: geo.size)
+              .ignoresSafeArea()
+          }
         }
 
-        // Layer 3: Drawing Canvas (Visuals ONLY, No Interactions)
-        TimelineView(.animation) { timeline in
+        // 3. Grain Overlay
+        TimelineView(.animation(minimumInterval: 0.1)) { timeline in
           Canvas { context, size in
-            let time = timeline.date.timeIntervalSince1970
-            model.updateTime(time)
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            var random = SeededRandom(seed: UInt64(time * 10))
 
-            var scaledContext = context
-            scaledContext.scaleBy(
-              x: model.globalScale * magnification, y: model.globalScale * magnification)
+            for _ in 0..<500 {
+              let x = random.nextCGFloat(in: 0...size.width)
+              let y = random.nextCGFloat(in: 0...size.height)
+              let opacity = random.nextDouble(in: 0.02...0.08)
 
-            drawFogLayer(context: scaledContext, size: size)
-
-            for flower in model.flowers {
-              drawFlower(flower, context: scaledContext, size: size, time: time)
+              let rect = CGRect(x: x, y: y, width: 1, height: 1)
+              context.fill(
+                Circle().path(in: rect),
+                with: .color(.white.opacity(opacity))
+              )
             }
-
-            drawGrainOverlay(context: scaledContext, size: size, time: time)
           }
         }
-        .allowsHitTesting(false)  // Explicitly disable hits on canvas to prevent interference
+        .ignoresSafeArea()
+        .allowsHitTesting(false)
 
-        // Layer 4: Interaction Layer (Transparent, Handles ALL Gestures)
-        Color.black.opacity(0.001)  // Almost invisible but captures touches
+        // 4. Canvas (Visual Layer)
+        GardenCanvas(appState: appState)
+          .allowsHitTesting(false)
+
+        // 5. Interaction Layer
+        Color.clear
           .contentShape(Rectangle())
-          .onTapGesture { location in
-            // Interaction 1: Tap to Spawn
-            print("Tap detected at: \(location)")
-            model.addFlower(at: location)
-            HapticManager.shared.light()
-          }
+          .simultaneousGesture(
+            TapGesture()
+              .onEnded {
+                // Tap handled via DragGesture below for simplicity if needed,
+                // but we can keep this empty if we rely on the drag ended logic.
+              }
+          )
+          .simultaneousGesture(
+            DragGesture(minimumDistance: 0)
+              .onChanged { value in
+                let translation = value.translation
+                let distance = sqrt(
+                  translation.width * translation.width + translation.height * translation.height)
 
-        // Layer 5: UI Controls (Topmost)
+                // If we haven't spawned a flower yet for this gesture, spawn one immediately
+                if currentFlowerId == nil && distance < 5 {
+                  let newFlowerId = appState.spawnFlower(
+                    at: value.startLocation, screenSize: geometry.size)
+                  currentFlowerId = newFlowerId
+                }
+
+                // If holding (minimal movement), grow the flower we just created
+                if distance < 5, let flowerId = currentFlowerId {
+                  appState.startGrowing(flowerId: flowerId)
+                }
+              }
+              .onEnded { value in
+                appState.stopGrowing()
+                currentFlowerId = nil  // Reset for next gesture
+
+                // Handle Drag (Move) vs Swipe (Wind)
+                let translation = value.translation
+                let distance = sqrt(
+                  translation.width * translation.width + translation.height * translation.height)
+
+                if distance > 50 && abs(translation.width) > abs(translation.height) * 1.5 {
+                  // Horizontal Swipe -> Wind
+                  let windDirection = translation.width > 0 ? 0.0 : Double.pi
+                  let windStrength = min(abs(translation.width) / 5, 50.0)
+
+                  withAnimation(.easeInOut(duration: 2.0)) {
+                    appState.wind.direction = windDirection
+                    appState.wind.strength = windStrength
+                  }
+
+                  DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    withAnimation(.easeInOut(duration: 4.0)) {
+                      appState.wind.strength = 5.0
+                    }
+                  }
+                  appState.hapticManager.medium()
+                }
+              }
+          )
+
+        // 6. UI Overlay
         VStack {
           Spacer()
           HStack {
-            Spacer()
-            Button {
-              showControlPanel.toggle()
-            } label: {
-              Image(systemName: "slider.horizontal.3")
-                .font(.system(size: 24))
-                .foregroundStyle(.white)
-                .frame(width: 56, height: 56)
-                .background(.ultraThinMaterial)
-                .clipShape(Circle())
-                .shadow(color: .black.opacity(0.3), radius: 10)
+            // Floating Menu Bar (Bottom Center)
+            HStack(spacing: 0) {
+              // Settings Button
+              Button {
+                appState.showControlPanel.toggle()
+              } label: {
+                Image(systemName: "slider.horizontal.3")
+                  .font(.system(size: 20))
+                  .foregroundStyle(.white.opacity(0.8))
+                  .frame(width: 60, height: 50)
+              }
+
+              Divider()
+                .frame(height: 30)
+                .background(Color.white.opacity(0.2))
+
+              // Clear All Button
+              Button {
+                appState.clearAll()
+              } label: {
+                Image(systemName: "trash")
+                  .font(.system(size: 18))
+                  .foregroundStyle(.white.opacity(0.8))
+                  .frame(width: 60, height: 50)
+              }
             }
-            .padding()
+            .background(
+              Capsule()
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.3), radius: 20, x: 0, y: 10)
+            )
+            .overlay(
+              Capsule()
+                .stroke(
+                  LinearGradient(
+                    colors: [.white.opacity(0.3), .clear, .white.opacity(0.1)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                  ),
+                  lineWidth: 1
+                )
+            )
+            .padding(.bottom, 40)
           }
+          .frame(maxWidth: .infinity)
+
+          // Flower Count (Bottom Center)
+          Text("\(appState.flowers.count) flowers")
+            .font(.caption)
+            .foregroundStyle(.white.opacity(0.5))
+            .padding(.bottom, 10)
         }
       }
-      .sheet(isPresented: $showControlPanel) {
-        ControlPanelSheet(model: model, canvasSize: geometry.size)
-      }
     }
-    .preferredColorScheme(.dark)
-  }
-
-  // MARK: - Drawing Functions
-
-  private func drawFogLayer(context: GraphicsContext, size: CGSize) {
-    let fogHeight: CGFloat = 200
-    let fogRect = CGRect(x: 0, y: size.height - fogHeight, width: size.width, height: fogHeight)
-
-    let gradient = Gradient(colors: [
-      Color.white.opacity(0),
-      Color(red: 0.7, green: 0.8, blue: 0.9).opacity(0.15),
-      Color(red: 0.6, green: 0.7, blue: 0.85).opacity(0.25),
-    ])
-
-    context.fill(
-      Path(fogRect),
-      with: .linearGradient(
-        gradient,
-        startPoint: CGPoint(x: size.width / 2, y: size.height - fogHeight),
-        endPoint: CGPoint(x: size.width / 2, y: size.height)
-      )
-    )
-  }
-
-  private func drawGrainOverlay(context: GraphicsContext, size: CGSize, time: TimeInterval) {
-    var random = SeededRandom(seed: UInt64(time * 10))
-
-    for _ in 0..<500 {
-      let x = random.nextCGFloat(in: 0...size.width)
-      let y = random.nextCGFloat(in: 0...size.height)
-      let opacity = random.nextDouble(in: 0.02...0.08)
-
-      let rect = CGRect(x: x, y: y, width: 1, height: 1)
-      context.fill(
-        Circle().path(in: rect),
-        with: .color(.white.opacity(opacity))
-      )
+    .ignoresSafeArea()
+    .sheet(isPresented: $appState.showControlPanel) {
+      ControlPanel(appState: appState)
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+        .interactiveDismissDisabled(false)
     }
-  }
-
-  private func drawFlower(
-    _ flower: Flower, context: GraphicsContext, size: CGSize, time: TimeInterval
-  ) {
-    // Calculate current head position with wind effects
-    let headPosition = flower.currentHeadPosition(
-      time: time,
-      windStrength: model.windStrength,
-      windDirection: model.windDirection
-    )
-    let pulse = flower.glowPulse(at: time)
-
-    // Skip if off screen
-    guard headPosition.y > -100 && headPosition.y < size.height + 100 else { return }
-
-    // Draw stem from base to head
-    let basePoint = CGPoint(x: flower.baseX, y: size.height - 50)  // Ground level
-    drawStem(
-      from: basePoint,
-      to: headPosition,
-      color: flower.color(palette: model.currentPalette),
-      context: context
-    )
-
-    // Draw flower head with chromatic aberration
-    drawFlowerHead(
-      flower: flower,
-      center: headPosition,
-      pulse: pulse,
-      context: context
-    )
-
-    // Draw floating orb
-    let orbY = headPosition.y - 30 - CGFloat(sin(time * 1.5 + flower.swayPhase)) * 8
-    let orbCenter = CGPoint(x: headPosition.x, y: orbY)
-    drawFloatingOrb(center: orbCenter, flower: flower, context: context)
-  }
-
-  private func drawStem(
-    from start: CGPoint, to end: CGPoint, color: Color, context: GraphicsContext
-  ) {
-    var path = Path()
-
-    // Create curved stem
-    let controlPoint = CGPoint(
-      x: (start.x + end.x) / 2 + (end.x - start.x) * 0.1,
-      y: (start.y + end.y) / 2
-    )
-
-    path.move(to: start)
-    path.addQuadCurve(to: end, control: controlPoint)
-
-    // Desaturated stem color
-    let stemColor = Color(
-      hue: color.hueComponent,
-      saturation: 0.3,
-      brightness: 0.4
-    )
-
-    context.stroke(
-      path,
-      with: .color(stemColor),
-      lineWidth: 3
-    )
-  }
-
-  private func drawFlowerHead(
-    flower: Flower, center: CGPoint, pulse: Double, context: GraphicsContext
-  ) {
-    let offset = model.chromaticOffset
-
-    // Draw glow layers first
-    let glowRadius = 40 * flower.scale * CGFloat(0.8 + pulse * 0.4) * CGFloat(model.bloomIntensity)
-
-    for i in stride(from: 3, to: 0, by: -1) {
-      let layerRadius = glowRadius * CGFloat(i) / 3
-      let layerOpacity = 0.15 / Double(i + 1)
-
-      drawPetals(
-        flower: flower,
-        center: center,
-        offset: .zero,
-        blur: layerRadius,
-        opacity: layerOpacity,
-        context: context
-      )
+    .onShake {
+      appState.showResetConfirmation = true
+      HapticManager.shared.warning()
     }
-
-    // Draw chromatic aberration layers (RGB offset)
-    if offset > 0 {
-      // Red layer (offset left-up)
-      drawPetals(
-        flower: flower,
-        center: center,
-        offset: CGPoint(x: -offset, y: -offset),
-        blur: 0,
-        opacity: 0.6,
-        tint: .red,
-        blendMode: .screen,
-        context: context
-      )
-
-      // Green layer (no offset)
-      drawPetals(
-        flower: flower,
-        center: center,
-        offset: .zero,
-        blur: 0,
-        opacity: 0.8,
-        tint: .green,
-        blendMode: .screen,
-        context: context
-      )
-
-      // Blue layer (offset right-down)
-      drawPetals(
-        flower: flower,
-        center: center,
-        offset: CGPoint(x: offset, y: offset),
-        blur: 0,
-        opacity: 0.6,
-        tint: .blue,
-        blendMode: .screen,
-        context: context
-      )
-    } else {
-      // No chromatic aberration - draw normal
-      drawPetals(
-        flower: flower,
-        center: center,
-        offset: .zero,
-        blur: 0,
-        opacity: 1.0,
-        context: context
-      )
+    .alert("Reset Garden?", isPresented: $appState.showResetConfirmation) {
+      Button("Reset", role: .destructive) { appState.resetToDefaults() }
+      Button("Cancel", role: .cancel) {}
     }
-
-    // Draw center sparkle
-    drawSparkle(center: center, flower: flower, time: model.currentTime, context: context)
-  }
-
-  private func drawPetals(
-    flower: Flower,
-    center: CGPoint,
-    offset: CGPoint,
-    blur: CGFloat,
-    opacity: Double,
-    tint: Color? = nil,
-    blendMode: GraphicsContext.BlendMode = .normal,
-    context: GraphicsContext
-  ) {
-    var petalContext = context
-    petalContext.blendMode = blendMode
-
-    if blur > 0 {
-      petalContext.addFilter(.blur(radius: blur))
-    }
-
-    let angleStep = (2 * .pi) / Double(flower.petalCount)
-
-    for i in 0..<flower.petalCount {
-      let angle = angleStep * Double(i)
-      let distance = flower.petalRadius * 0.5
-      let petalX = center.x + offset.x + cos(angle) * distance
-      let petalY = center.y + offset.y + sin(angle) * distance
-
-      // Create organic blob shape for petal
-      let petalSize = flower.petalRadius * 1.2
-      let petalCenter = CGPoint(x: petalX, y: petalY)
-
-      // Draw petal as organic blob (ellipse with slight rotation)
-      var path = Path()
-      let blobRect = CGRect(
-        x: petalCenter.x - petalSize / 2,
-        y: petalCenter.y - petalSize / 2,
-        width: petalSize,
-        height: petalSize * 0.85  // Slightly squashed for organic look
-      )
-
-      path.addEllipse(in: blobRect)
-
-      // For glow layers, use the flower color
-      // For main petals, use white center with colored edge
-      let petalColor: Color
-      if blur > 0 {
-        // Glow layers use flower color
-        petalColor = tint ?? flower.color(palette: model.currentPalette)
-      } else {
-        // Main petals: white center fading to flower color
-        petalColor = tint ?? .white
-      }
-
-      petalContext.fill(
-        path,
-        with: .color(petalColor.opacity(opacity))
-      )
-    }
-
-    // Draw white center for main flower (not for glow layers)
-    if blur == 0 && tint == nil {
-      let centerSize = flower.petalRadius * 0.6
-      let centerRect = CGRect(
-        x: center.x + offset.x - centerSize / 2,
-        y: center.y + offset.y - centerSize / 2,
-        width: centerSize,
-        height: centerSize
-      )
-
-      // White center with gradient to flower color
-      let gradient = Gradient(colors: [
-        .white,
-        .white.opacity(0.9),
-        flower.color(palette: model.currentPalette).opacity(0.7),
-      ])
-
-      petalContext.fill(
-        Circle().path(in: centerRect),
-        with: .radialGradient(
-          gradient,
-          center: CGPoint(x: centerSize / 2, y: centerSize / 2),
-          startRadius: 0,
-          endRadius: centerSize / 2
-        )
-      )
-    }
-  }
-
-  private func drawSparkle(
-    center: CGPoint, flower: Flower, time: TimeInterval, context: GraphicsContext
-  ) {
-    let sparkleSize: CGFloat = 16 * flower.scale
-    let rotation = time * 0.5 + flower.swayPhase
-
-    var sparkleContext = context
-    sparkleContext.translateBy(x: center.x, y: center.y)
-    sparkleContext.rotate(by: Angle(radians: rotation))
-
-    let sparkleRect = CGRect(
-      x: -sparkleSize / 2,
-      y: -sparkleSize / 2,
-      width: sparkleSize,
-      height: sparkleSize
-    )
-
-    let gradient = Gradient(colors: [
-      .white,
-      flower.color(palette: model.currentPalette).opacity(0.8),
-      .white.opacity(0),
-    ])
-
-    sparkleContext.fill(
-      Circle().path(in: sparkleRect),
-      with: .radialGradient(
-        gradient,
-        center: .zero,
-        startRadius: 0,
-        endRadius: sparkleSize / 2
-      )
-    )
-  }
-
-  private func drawFloatingOrb(center: CGPoint, flower: Flower, context: GraphicsContext) {
-    let orbSize: CGFloat = 12 * flower.scale
-    let offset = model.chromaticOffset * 0.5
-
-    // Draw chromatic orb layers
-    if offset > 0 {
-      drawOrbLayer(
-        center: center, size: orbSize, offset: CGPoint(x: -offset, y: -offset), color: .red,
-        context: context)
-      drawOrbLayer(center: center, size: orbSize, offset: .zero, color: .green, context: context)
-      drawOrbLayer(
-        center: center, size: orbSize, offset: CGPoint(x: offset, y: offset), color: .blue,
-        context: context)
-    } else {
-      drawOrbLayer(
-        center: center, size: orbSize, offset: .zero,
-        color: flower.color(palette: model.currentPalette), context: context)
-    }
-  }
-
-  private func drawOrbLayer(
-    center: CGPoint, size: CGFloat, offset: CGPoint, color: Color, context: GraphicsContext
-  ) {
-    var orbContext = context
-    orbContext.blendMode = .screen
-
-    let orbRect = CGRect(
-      x: center.x + offset.x - size / 2,
-      y: center.y + offset.y - size / 2,
-      width: size,
-      height: size
-    )
-
-    orbContext.fill(
-      Circle().path(in: orbRect),
-      with: .color(color.opacity(0.7))
-    )
   }
 }
 
-// MARK: - Color Extension
+// Shake Detection Helper
+extension UIDevice {
+  static let deviceDidShakeNotification = Notification.Name(rawValue: "deviceDidShakeNotification")
+}
 
-extension Color {
-  var hueComponent: Double {
-    var hue: CGFloat = 0
-    UIColor(self).getHue(&hue, saturation: nil, brightness: nil, alpha: nil)
-    return Double(hue)
+extension UIWindow {
+  open override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
+    if motion == .motionShake {
+      NotificationCenter.default.post(name: UIDevice.deviceDidShakeNotification, object: nil)
+    }
+  }
+}
+
+struct DeviceShakeViewModifier: ViewModifier {
+  let action: () -> Void
+
+  func body(content: Content) -> some View {
+    content
+      .onReceive(NotificationCenter.default.publisher(for: UIDevice.deviceDidShakeNotification)) {
+        _ in
+        action()
+      }
+  }
+}
+
+extension View {
+  func onShake(perform action: @escaping () -> Void) -> some View {
+    self.modifier(DeviceShakeViewModifier(action: action))
   }
 }
 
