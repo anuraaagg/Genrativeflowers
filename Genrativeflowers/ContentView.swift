@@ -18,10 +18,10 @@ struct ContentView: View {
         // 1. Gradient Background
         LinearGradient(
           colors: [
-            Color(red: 0.08, green: 0.10, blue: 0.18),  // Soft deep indigo
-            Color(red: 0.04, green: 0.06, blue: 0.12),  // Smooth mid-tone
-            Color(red: 0.02, green: 0.03, blue: 0.08),  // Gentle dark blue
-            Color(red: 0.01, green: 0.02, blue: 0.05),  // Soft black
+            Color(red: 0.06, green: 0.08, blue: 0.16),  // Deep navy
+            Color(red: 0.03, green: 0.05, blue: 0.12),  // Rich dark blue
+            Color(red: 0.02, green: 0.03, blue: 0.09),  // Darker midnight
+            Color(red: 0.01, green: 0.02, blue: 0.06),  // Near black
           ],
           startPoint: .top,
           endPoint: .bottom
@@ -36,16 +36,17 @@ struct ContentView: View {
           }
         }
 
-        // 3. Grain Overlay
+        // 3. Grain Overlay (Enhanced texture)
         TimelineView(.animation(minimumInterval: 0.1)) { timeline in
           Canvas { context, size in
             let time = timeline.date.timeIntervalSinceReferenceDate
             var random = SeededRandom(seed: UInt64(time * 10))
 
-            for _ in 0..<500 {
+            // More grain particles for better texture
+            for _ in 0..<800 {
               let x = random.nextCGFloat(in: 0...size.width)
               let y = random.nextCGFloat(in: 0...size.height)
-              let opacity = random.nextDouble(in: 0.02...0.08)
+              let opacity = random.nextDouble(in: 0.03...0.12)
 
               let rect = CGRect(x: x, y: y, width: 1, height: 1)
               context.fill(

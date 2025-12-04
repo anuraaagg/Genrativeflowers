@@ -237,12 +237,11 @@ struct GardenCanvas: View {
       color: color.opacity(0.6)
     )
 
-
     // Radial lines center (stamens)
     var centerContext = context
     centerContext.translateBy(x: finalHeadPos.x, y: finalHeadPos.y)
 
-    // Strong white glow inside the center (behind lines)
+    // Strong white glow inside the center (under lines)
     centerContext.fill(
       Circle().path(in: CGRect(x: -8, y: -8, width: 16, height: 16)),
       with: .color(.white.opacity(0.9))
@@ -253,14 +252,14 @@ struct GardenCanvas: View {
       with: .color(.white)
     )
 
-    // Draw radial lines (stamens) - make them darker and more pronounced
+    // Draw radial lines (stamens) with subtle white outline for visibility
     let stamenCount = 12
-    let stamenRadius: CGFloat = 12.0
+    let stamenRadius: CGFloat = 14.0
 
     for i in 0..<stamenCount {
       let angle = (Double.pi * 2 / Double(stamenCount)) * Double(i)
-      let startX = cos(angle) * 2.0
-      let startY = sin(angle) * 2.0
+      let startX = cos(angle) * 3.0
+      let startY = sin(angle) * 3.0
       let endX = cos(angle) * stamenRadius
       let endY = sin(angle) * stamenRadius
 
@@ -269,16 +268,34 @@ struct GardenCanvas: View {
         p.addLine(to: CGPoint(x: endX, y: endY))
       }
 
+      // Draw subtle white outline first for separation from glow
       centerContext.stroke(
         path,
-        with: .color(Color(red: 0.05, green: 0.05, blue: 0.15)),
-        lineWidth: 2.0
+        with: .color(.white.opacity(0.6)),
+        lineWidth: 3.5
       )
 
-      // Larger dot at the end of each stamen
-      let dotRect = CGRect(x: endX - 2, y: endY - 2, width: 4, height: 4)
+      // Draw dark line on top
+      centerContext.stroke(
+        path,
+        with: .color(Color(red: 0.05, green: 0.05, blue: 0.15).opacity(0.9)),
+        lineWidth: 2.5
+      )
+
+      // Dot at the end with outline
+      let dotRect = CGRect(x: endX - 2.5, y: endY - 2.5, width: 5, height: 5)
+
+      // White outline for dot
       centerContext.fill(
-        Circle().path(in: dotRect), with: .color(Color(red: 0.1, green: 0.1, blue: 0.2)))
+        Circle().path(in: dotRect.insetBy(dx: -0.5, dy: -0.5)),
+        with: .color(.white.opacity(0.5))
+      )
+
+      // Dark dot on top
+      centerContext.fill(
+        Circle().path(in: dotRect),
+        with: .color(Color(red: 0.06, green: 0.06, blue: 0.18))
+      )
     }
   }
 

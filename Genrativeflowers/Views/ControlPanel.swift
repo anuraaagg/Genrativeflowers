@@ -15,14 +15,13 @@ struct ControlPanel: View {
     VStack(spacing: 16) {
       // Header
       Text("Control Centre")
-        .font(.title3)
+        .font(.headline)
         .fontWeight(.semibold)
         .foregroundStyle(.black)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.bottom, 4)
 
       // 1. Visual Settings
-      VStack(spacing: 16) {
+      VStack(spacing: 12) {
         Text("Visuals")
           .font(.caption)
           .fontWeight(.semibold)
@@ -47,7 +46,7 @@ struct ControlPanel: View {
       }
 
       // 2. Physics & Environment
-      VStack(spacing: 16) {
+      VStack(spacing: 12) {
         Text("Environment")
           .font(.caption)
           .fontWeight(.semibold)
@@ -77,7 +76,7 @@ struct ControlPanel: View {
           }
           .offset(y: 24)
         )
-        .padding(.bottom, 10)
+        .padding(.bottom, 8)
       }
 
       // Instructions (Bottom)
@@ -85,11 +84,11 @@ struct ControlPanel: View {
         .font(.caption2)
         .foregroundStyle(.gray.opacity(0.6))
         .multilineTextAlignment(.center)
-        .padding(.top, 12)
+        .padding(.top, 4)
     }
-    .padding(.horizontal, 24)
-    .padding(.top, 20)
-    .padding(.bottom, 20)
+    .padding(.horizontal, 20)
+    .padding(.top, 16)
+    .padding(.bottom, 16)
   }
 }
 
