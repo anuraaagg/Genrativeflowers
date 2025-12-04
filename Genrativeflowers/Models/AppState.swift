@@ -38,7 +38,7 @@ class AppState: ObservableObject {
   // MARK: - Limits
   let maxFlowers = 60
   let maxStems = 30
-  let baselineY: CGFloat = 0.78  // 78% of screen height
+  let baselineY: CGFloat = 1.0  // 100% of screen height (bottom)
 
   // MARK: - Actions
 

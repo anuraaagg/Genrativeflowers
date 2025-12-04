@@ -26,7 +26,10 @@ struct GardenCanvas: View {
             drawParallaxBackground(context: context, size: size)
           }
 
-          // 2. Draw Stems
+          // 2. Draw Grass (Behind stems)
+          drawGrass(context: context, size: size, time: now)
+
+          // 3. Draw Stems
           for stem in appState.stems {
             drawStem(stem, context: context)
           }
@@ -78,22 +81,26 @@ struct GardenCanvas: View {
     let roll = appState.motionManager.roll
 
     // Background offset (max 2px)
-    let backX = CGFloat(roll * 20)  // amplified for visibility
+    let backX = CGFloat(roll * 20)
     let backY = CGFloat(pitch * 20)
 
-    // Draw some distant shapes or gradient
-    // For now, just a subtle gradient shift
+    // "Magical Night" Background Gradient
+    let rect = CGRect(origin: .zero, size: size)
+    let center = CGPoint(x: size.width / 2 + backX, y: size.height / 2 + backY)
+
+    // Radial glow
     let gradient = Gradient(colors: [
-      Color.blue.opacity(0.1),
-      Color.purple.opacity(0.05),
+      Color(red: 0.05, green: 0.1, blue: 0.2).opacity(0.4),
+      Color.black.opacity(0.8),
     ])
 
     context.fill(
-      Path(CGRect(origin: .zero, size: size)),
-      with: .linearGradient(
+      Path(rect),
+      with: .radialGradient(
         gradient,
-        startPoint: CGPoint(x: size.width / 2 + backX, y: 0 + backY),
-        endPoint: CGPoint(x: size.width / 2 - backX, y: size.height - backY)
+        center: center,
+        startRadius: 0,
+        endRadius: size.height * 0.8
       )
     )
   }
@@ -108,11 +115,16 @@ struct GardenCanvas: View {
       path.addLine(to: stem.points[i])
     }
 
-    // Smooth the path if possible, or use QuadCurve in the model
+    // Stem Gradient: #14757a to #39c6d6
+    let stemGradient = Gradient(colors: [
+      Color(red: 0.08, green: 0.46, blue: 0.48),  // #14757a
+      Color(red: 0.22, green: 0.78, blue: 0.84),  // #39c6d6
+    ])
 
     context.stroke(
       path,
-      with: .color(Color.green.opacity(0.6)),
+      with: .linearGradient(
+        stemGradient, startPoint: stem.points.first!, endPoint: stem.points.last!),
       lineWidth: stem.thickness
     )
 
@@ -123,17 +135,41 @@ struct GardenCanvas: View {
   }
 
   private func drawLeaf(_ leaf: Stem.Leaf, context: GraphicsContext) {
-    // Simple leaf shape
-    var path = Path()
-    let size = leaf.size
-    let rect = CGRect(x: -size / 2, y: -size, width: size, height: size * 2)
-    path.addEllipse(in: rect)
-
+    // Leaf Shape: Rounded opposite corners
     var leafContext = context
     leafContext.translateBy(x: leaf.position.x, y: leaf.position.y)
     leafContext.rotate(by: Angle(radians: leaf.angle))
 
-    leafContext.fill(path, with: .color(Color.green.opacity(0.8)))
+    let w = leaf.size * 0.8
+    let h = leaf.size * 2.0
+
+    // Custom path for the leaf shape
+    let path = Path { p in
+      p.move(to: CGPoint(x: 0, y: -h / 2))
+      p.addLine(to: CGPoint(x: w, y: -h / 2))
+      p.addCurve(
+        to: CGPoint(x: w, y: h / 2),
+        control1: CGPoint(x: w, y: -h / 2 + h * 0.2),
+        control2: CGPoint(x: w, y: h / 2 - h * 0.2)
+      )
+      p.addLine(to: CGPoint(x: 0, y: h / 2))
+      p.addCurve(
+        to: CGPoint(x: 0, y: -h / 2),
+        control1: CGPoint(x: 0, y: h / 2 - h * 0.2),
+        control2: CGPoint(x: 0, y: -h / 2 + h * 0.2)
+      )
+    }
+
+    // Leaf Gradient
+    let leafGradient = Gradient(colors: [
+      Color(red: 0.08, green: 0.46, blue: 0.48).opacity(0.6),  // #14757a
+      Color(red: 0.22, green: 0.78, blue: 0.84),  // #39c6d6
+    ])
+
+    leafContext.fill(
+      path,
+      with: .linearGradient(
+        leafGradient, startPoint: CGPoint(x: 0, y: h / 2), endPoint: CGPoint(x: w, y: -h / 2)))
   }
 
   private func drawFlower(
@@ -156,18 +192,56 @@ struct GardenCanvas: View {
     // Use the swayed position
     let finalHeadPos = swayedHeadPos
 
-    // Draw stem
+    // Draw stem with natural curve
     var stemPath = Path()
     stemPath.move(to: basePos)
 
-    // Control point for curve
-    let midX = (basePos.x + finalHeadPos.x) / 2
-    let midY = (basePos.y + finalHeadPos.y) / 2
-    let control = CGPoint(x: midX + (finalHeadPos.x - basePos.x) * 0.2, y: midY)
+    // Create natural curves using the flower's unique stemCurve
+    let stemLength = abs(finalHeadPos.y - basePos.y)
 
-    stemPath.addQuadCurve(to: finalHeadPos, control: control)
+    // Control points for a more natural S-curve or C-curve
+    let control1X = basePos.x + flower.stemCurve
+    let control1Y = basePos.y - stemLength * 0.33
 
-    context.stroke(stemPath, with: .color(Color.green.opacity(0.5)), lineWidth: 2)
+    let control2X = finalHeadPos.x - flower.stemCurve * 0.5
+    let control2Y = basePos.y - stemLength * 0.66
+
+    let control1 = CGPoint(x: control1X, y: control1Y)
+    let control2 = CGPoint(x: control2X, y: control2Y)
+
+    stemPath.addCurve(to: finalHeadPos, control1: control1, control2: control2)
+
+    // Stem Gradient
+    let stemGradient = Gradient(colors: [
+      Color(red: 0.08, green: 0.46, blue: 0.48),  // #14757a
+      Color(red: 0.22, green: 0.78, blue: 0.84),  // #39c6d6
+    ])
+
+    context.stroke(
+      stemPath, with: .linearGradient(stemGradient, startPoint: basePos, endPoint: finalHeadPos),
+      lineWidth: 2)
+
+    // Draw Leaves on the main stem
+    let t1: CGFloat = 0.4
+    let t2: CGFloat = 0.7
+
+    let leaf1Pos = calculateCubicCurvePoint(
+      t: t1, p0: basePos, c1: control1, c2: control2, p1: finalHeadPos)
+    let leaf2Pos = calculateCubicCurvePoint(
+      t: t2, p0: basePos, c1: control1, c2: control2, p1: finalHeadPos)
+
+    var leafContext = context
+    // Leaf 1
+    leafContext.translateBy(x: leaf1Pos.x, y: leaf1Pos.y)
+    leafContext.rotate(by: Angle(radians: -0.8))  // More outward
+    drawStemLeaf(context: leafContext, size: 30, color: Color(red: 0.22, green: 0.78, blue: 0.84))
+
+    // Leaf 2
+    leafContext = context
+    leafContext.translateBy(x: leaf2Pos.x, y: leaf2Pos.y)
+    leafContext.rotate(by: Angle(radians: 0.8))  // More outward
+    leafContext.scaleBy(x: -1, y: 1)  // Flip
+    drawStemLeaf(context: leafContext, size: 25, color: Color(red: 0.22, green: 0.78, blue: 0.84))
 
     // Draw Flower Head with Fluid Chromatic Aberration (RGB Split)
     let color = flower.color(palette: appState.palette)
@@ -297,6 +371,83 @@ struct GardenCanvas: View {
         with: .color(Color(red: 0.06, green: 0.06, blue: 0.18))
       )
     }
+
+    // 5. Fireflies (Glowing dots)
+    let lightCount = 8
+    for i in 0..<lightCount {
+      let speed = 2.0
+      let offset = Double(i) * (Double.pi * 2 / Double(lightCount))
+      let orbitRadius = baseRadius * 1.2
+
+      let lx = cos(time * speed + offset) * orbitRadius
+      let ly = sin(time * speed + offset) * orbitRadius * 0.5
+
+      let pulse = (sin(time * 4 + offset) + 1) * 0.5
+      let lightSize = 3.0 + pulse * 3.0
+
+      let lightColor =
+        i % 2 == 0
+        ? Color(red: 1.0, green: 0.98, blue: 0.0) : Color(red: 0.14, green: 0.94, blue: 1.0)
+
+      var lightContext = context
+      lightContext.translateBy(x: finalHeadPos.x, y: finalHeadPos.y)  // Center on flower head
+      lightContext.addFilter(.blur(radius: 2))
+      lightContext.fill(
+        Circle().path(
+          in: CGRect(
+            x: lx - lightSize / 2, y: ly - lightSize / 2, width: lightSize, height: lightSize)),
+        with: .color(lightColor)
+      )
+    }
+  }
+
+  private func calculateQuadCurvePoint(t: CGFloat, p0: CGPoint, c: CGPoint, p1: CGPoint) -> CGPoint
+  {
+    let x = (1 - t) * (1 - t) * p0.x + 2 * (1 - t) * t * c.x + t * t * p1.x
+    let y = (1 - t) * (1 - t) * p0.y + 2 * (1 - t) * t * c.y + t * t * p1.y
+    return CGPoint(x: x, y: y)
+  }
+
+  private func calculateCubicCurvePoint(
+    t: CGFloat, p0: CGPoint, c1: CGPoint, c2: CGPoint, p1: CGPoint
+  ) -> CGPoint {
+    let t2 = t * t
+    let t3 = t2 * t
+    let mt = 1 - t
+    let mt2 = mt * mt
+    let mt3 = mt2 * mt
+
+    let x = mt3 * p0.x + 3 * mt2 * t * c1.x + 3 * mt * t2 * c2.x + t3 * p1.x
+    let y = mt3 * p0.y + 3 * mt2 * t * c1.y + 3 * mt * t2 * c2.y + t3 * p1.y
+
+    return CGPoint(x: x, y: y)
+  }
+
+  private func drawStemLeaf(context: GraphicsContext, size: CGFloat, color: Color) {
+    let w = size * 0.6
+    let h = size
+
+    let path = Path { p in
+      p.move(to: CGPoint(x: 0, y: 0))
+      p.addCurve(
+        to: CGPoint(x: w, y: -h),
+        control1: CGPoint(x: w * 0.2, y: -h * 0.2),
+        control2: CGPoint(x: w, y: -h * 0.8)
+      )
+      p.addCurve(
+        to: CGPoint(x: 0, y: 0),
+        control1: CGPoint(x: w * 0.8, y: -h * 0.2),
+        control2: CGPoint(x: 0, y: -h * 0.2)
+      )
+    }
+
+    context.fill(
+      path,
+      with: .linearGradient(
+        Gradient(colors: [color.opacity(0.4), color]),
+        startPoint: CGPoint(x: 0, y: 0),
+        endPoint: CGPoint(x: w, y: -h)
+      ))
   }
 
   private func drawPetals(context: GraphicsContext, count: Int, radius: CGFloat, color: Color) {
@@ -310,6 +461,68 @@ struct GardenCanvas: View {
       petalContext.fill(Ellipse().path(in: petalRect), with: .color(color))
     }
   }
+
+  private func drawGrass(context: GraphicsContext, size: CGSize, time: TimeInterval) {
+    let grassCount = 60
+    let width = size.width
+    let groundY = size.height * appState.baselineY
+
+    // Use a stable random generator based on index
+    for i in 0..<grassCount {
+      var random = SeededRandom(seed: UInt64(i * 999))
+
+      let xPos = random.nextCGFloat(in: -50...width + 50)
+      let bladeHeight = random.nextCGFloat(in: 60...140)
+      let bladeWidth = random.nextCGFloat(in: 4...8)
+      let angle = random.nextDouble(in: -0.2...0.2)
+      let swaySpeed = random.nextDouble(in: 1.0...3.0)
+      let swayPhase = random.nextDouble(in: 0...Double.pi * 2)
+
+      // Wind sway
+      let windSway =
+        sin(time * swaySpeed + swayPhase) * 5.0
+        + (appState.wind.strength * 0.2 * cos(appState.wind.direction))
+
+      var bladeContext = context
+      bladeContext.translateBy(x: xPos, y: groundY + 10)  // Slightly below baseline to hide bottom
+      bladeContext.rotate(by: Angle(radians: angle))
+
+      // Blade Path
+      let path = Path { p in
+        p.move(to: CGPoint(x: 0, y: 0))
+        p.addCurve(
+          to: CGPoint(x: windSway, y: -bladeHeight),
+          control1: CGPoint(x: bladeWidth / 2, y: -bladeHeight * 0.3),
+          control2: CGPoint(x: windSway * 0.5, y: -bladeHeight * 0.7)
+        )
+        p.addLine(to: CGPoint(x: bladeWidth, y: 0))
+      }
+
+      // Gradient
+      let grassGradient = Gradient(colors: [
+        Color(red: 0.05, green: 0.3, blue: 0.35),  // Darker base
+        Color(red: 0.15, green: 0.65, blue: 0.7),  // Lighter tip
+      ])
+
+      bladeContext.fill(
+        path,
+        with: .linearGradient(
+          grassGradient, startPoint: CGPoint(x: 0, y: 0), endPoint: CGPoint(x: 0, y: -bladeHeight)))
+    }
+
+    // Add a dark overlay gradient at the very bottom to blend roots
+    // Add a dark overlay gradient at the very bottom to blend roots
+    // Since groundY is now at the bottom (size.height), we need to draw up from there
+    let bottomRect = CGRect(x: 0, y: groundY - 40, width: width, height: 40)
+    context.fill(
+      Path(bottomRect),
+      with: .linearGradient(
+        Gradient(colors: [.clear, Color.black.opacity(0.8)]),
+        startPoint: CGPoint(x: 0, y: groundY - 40),
+        endPoint: CGPoint(x: 0, y: groundY)
+      ))
+  }
+
 }
 
 // Extension to get hue component from Color

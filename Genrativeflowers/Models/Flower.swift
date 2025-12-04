@@ -35,6 +35,12 @@ struct Flower: Identifiable, Equatable {
     return seed * 0.1
   }
 
+  // Stem curve for natural variation
+  var stemCurve: CGFloat {
+    let curveValue = seed.truncatingRemainder(dividingBy: 100)
+    return CGFloat(curveValue - 50) * 0.6  // Range from -30 to +30
+  }
+
   // Helper to get color based on current palette
   func color(palette: ColorPalette) -> Color {
     return palette.randomColor(seed: seed)
