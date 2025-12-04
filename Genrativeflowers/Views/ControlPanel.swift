@@ -12,7 +12,7 @@ struct ControlPanel: View {
   @State private var showInstructions = false
 
   var body: some View {
-    VStack(spacing: 20) {
+    VStack(spacing: 16) {
       // Header
       Text("Control Centre")
         .font(.title3)
