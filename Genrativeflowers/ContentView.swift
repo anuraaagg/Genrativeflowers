@@ -15,13 +15,14 @@ struct ContentView: View {
   var body: some View {
     GeometryReader { geometry in
       ZStack {
-        // 1. Gradient Background
+        // 1. Gradient Background - Vibrant sunset palette
         LinearGradient(
           colors: [
-            Color(red: 0.06, green: 0.08, blue: 0.16),  // Deep navy
-            Color(red: 0.03, green: 0.05, blue: 0.12),  // Rich dark blue
-            Color(red: 0.02, green: 0.03, blue: 0.09),  // Darker midnight
-            Color(red: 0.01, green: 0.02, blue: 0.06),  // Near black
+            Color(red: 0.45, green: 0.25, blue: 0.65),  // Deep purple
+            Color(red: 0.50, green: 0.25, blue: 0.55),  // Purple-pink
+            Color(red: 0.45, green: 0.20, blue: 0.40),  // Dark magenta
+            Color(red: 0.35, green: 0.15, blue: 0.30),  // Deep purple-brown
+            Color(red: 0.25, green: 0.12, blue: 0.20),  // Very dark purple
           ],
           startPoint: .top,
           endPoint: .bottom
