@@ -112,7 +112,8 @@ class AppState: ObservableObject {
 
 class WindState: ObservableObject {
   @Published var direction: Double = 0.0  // Radians
-  @Published var strength: Double = 5.0  // 0-100, gentler default
+  @Published var strength: Double = 5.0  // 0-100, current wind strength
+  @Published var baseStrength: Double = 5.0  // Base strength from slider
   var decay: Double = 0.98  // Slower decay for smoother motion
 }
 

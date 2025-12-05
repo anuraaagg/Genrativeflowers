@@ -12,7 +12,7 @@ struct ControlPanel: View {
   @State private var showInstructions = false
 
   var body: some View {
-    VStack(spacing: 24) {
+    VStack(spacing: 4) {
       // Header
       Text("Control Centre")
         .font(.headline)
@@ -21,7 +21,7 @@ struct ControlPanel: View {
         .frame(maxWidth: .infinity, alignment: .leading)
 
       // 1. Visual Settings
-      VStack(spacing: 12) {
+      VStack(spacing: 24) {
         Text("Visuals")
           .font(.caption)
           .fontWeight(.semibold)
@@ -55,7 +55,7 @@ struct ControlPanel: View {
 
         ControlSlider(
           label: "Wind Strength",
-          value: $appState.wind.strength,
+          value: $appState.wind.baseStrength,
           range: 0.0...50.0,
           step: 1.0,
           tooltip: "breeze strength"

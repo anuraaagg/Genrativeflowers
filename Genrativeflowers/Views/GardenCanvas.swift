@@ -68,8 +68,21 @@ struct GardenCanvas: View {
           appState.wind.strength = min(100, appState.wind.strength + abs(gyro) * 2)
         }
 
-        // Decay wind
-        appState.wind.strength *= appState.wind.decay
+        // Decay wind towards base strength (continuous wind loop)
+        let currentWind = appState.wind.strength
+        let baseWind = appState.wind.baseStrength
+        
+        if currentWind > baseWind {
+          // Decay down to base
+          appState.wind.strength = max(baseWind, currentWind * appState.wind.decay)
+        } else if currentWind < baseWind {
+          // Ramp up to base
+          appState.wind.strength = min(baseWind, currentWind + (baseWind - currentWind) * 0.1)
+        }
+        
+        // Add subtle variation for natural feel
+        let variation = sin(time * 0.5) * (baseWind * 0.15)
+        appState.wind.strength += variation
       }
     }
   }
