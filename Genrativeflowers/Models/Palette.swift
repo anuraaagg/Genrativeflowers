@@ -34,13 +34,11 @@ enum ColorPalette: String, CaseIterable, Identifiable {
     case .sunset:
       // Orange/Red/Purple/Yellow
       // Hues roughly 0.0 (red) to 0.16 (yellow) and 0.8 (purple)
-      let variant = Int(seed * 4)
-      switch variant {
-      case 0: return Color(hue: 0.05, saturation: 0.8, brightness: 0.9)  // Orange
-      case 1: return Color(hue: 0.12, saturation: 0.7, brightness: 1.0)  // Yellow
-      case 2: return Color(hue: 0.95, saturation: 0.8, brightness: 0.8)  // Red-Pink
-      default: return Color(hue: 0.8, saturation: 0.6, brightness: 0.7)  // Purple
-      }
+      let variant = Int(seed * 100) % 8  // More variation
+      let hueValue = Double(variant) / 8.0  // Spread across spectrum
+      return Color(
+        hue: hueValue, saturation: 0.7 + (seed * 0.1).truncatingRemainder(dividingBy: 0.3),
+        brightness: 0.9)
     }
   }
 

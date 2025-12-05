@@ -326,7 +326,7 @@ struct GardenCanvas: View {
       with: .color(.white)
     )
 
-    // Draw radial lines (stamens) with subtle white outline for visibility
+    // Draw radial lines (stamens) with color variation
     let stamenCount = 12
     let stamenRadius: CGFloat = 14.0
 
@@ -342,33 +342,37 @@ struct GardenCanvas: View {
         p.addLine(to: CGPoint(x: endX, y: endY))
       }
 
+      // Get a darkened version of the flower color for stamens
+      let stamenColor = color.opacity(0.7)
+
       // Draw subtle white outline first for separation from glow
       centerContext.stroke(
         path,
-        with: .color(.white.opacity(0.6)),
-        lineWidth: 3.5
-      )
-
-      // Draw dark line on top
-      centerContext.stroke(
-        path,
-        with: .color(Color(red: 0.05, green: 0.05, blue: 0.15).opacity(0.9)),
+        with: .color(.white.opacity(0.4)),
         lineWidth: 2.5
       )
 
-      // Dot at the end with outline
-      let dotRect = CGRect(x: endX - 2.5, y: endY - 2.5, width: 5, height: 5)
-
-      // White outline for dot
-      centerContext.fill(
-        Circle().path(in: dotRect.insetBy(dx: -0.5, dy: -0.5)),
-        with: .color(.white.opacity(0.5))
+      // Draw colored line on top
+      centerContext.stroke(
+        path,
+        with: .color(stamenColor),
+        lineWidth: 1.5
       )
 
-      // Dark dot on top
+      // Dot at the end with flower color
+      let dotRect = CGRect(x: endX - 3, y: endY - 3, width: 6, height: 6)
+
+      // Glow around dot
+      centerContext.fill(
+        Circle().path(in: dotRect.insetBy(dx: -1, dy: -1)),
+        with: .color(color.opacity(0.3))
+      )
+      centerContext.addFilter(.blur(radius: 1))
+
+      // Colored dot on top
       centerContext.fill(
         Circle().path(in: dotRect),
-        with: .color(Color(red: 0.06, green: 0.06, blue: 0.18))
+        with: .color(color.opacity(0.9))
       )
     }
 
